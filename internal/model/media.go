@@ -4,7 +4,7 @@ package model
 type Kind string
 
 const (
-	KindMovie Kind = "movie"
+	KindMovie  Kind = "movie"
 	KindSeries Kind = "series"
 )
 
@@ -20,17 +20,22 @@ type Media struct {
 	Poster   string   `json:"poster"`
 	Backdrop string   `json:"backdrop"`
 	Overview string   `json:"overview"`
-	Source   string   `json:"source,omitempty"` // URL interna del stream
+	Source   string   `json:"source,omitempty"` // URL interna del stream (legacy)
+
+	// Storage path dentro del bucket (nuevo). El API lo usa para generar
+	// una presigned URL vía movie_worker.
+	StorageKey string `json:"storage_key,omitempty"`
+	Lang       string `json:"lang,omitempty"` // "es-ES", "en-US"…
 
 	// Solo series
-	Seasons  int                       `json:"seasons,omitempty"`
-	Episodes map[string][]Episode      `json:"episodes,omitempty"`
+	Seasons  int                    `json:"seasons,omitempty"`
+	Episodes map[string][]Episode   `json:"episodes,omitempty"`
 
 	// Detalle
-	Cast      []string  `json:"cast,omitempty"`
-	Director  string    `json:"director,omitempty"`
-	Tagline   string    `json:"tagline,omitempty"`
-	Similar   []string  `json:"similar,omitempty"`
+	Cast     []string `json:"cast,omitempty"`
+	Director string   `json:"director,omitempty"`
+	Tagline  string   `json:"tagline,omitempty"`
+	Similar  []string `json:"similar,omitempty"`
 }
 
 type Episode struct {
@@ -55,10 +60,11 @@ type Hero struct {
 }
 
 // JobRequest es el payload para encolar trabajo en movie_worker.
+// `Notes` se serializa como JSON y se pasa como args al job.
 type JobRequest struct {
-	Kind    string `json:"kind"`    // "probe" | "transcode" | "scrape" | "ingest"
+	Kind    string `json:"kind"`    // "probe" | "transcode" | "scrape" | "ingest" | "download" | "upload"
 	MediaID string `json:"media_id"`
-	Notes   string `json:"notes,omitempty"`
+	Notes   string `json:"notes,omitempty"` // JSON con media_id, source_url, lang, etc.
 }
 
 type JobResponse struct {

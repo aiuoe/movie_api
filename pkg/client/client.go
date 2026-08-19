@@ -57,3 +57,27 @@ func (w *Worker) NotifyStreamReady(mediaID string) error {
 	defer resp.Body.Close()
 	return nil
 }
+
+// Presign pide al worker una URL presigned para `key`, válida por `ttl`.
+// La URL la emite el worker usando sus credenciales de MinIO/S3.
+func (w *Worker) Presign(key string, ttl time.Duration) (string, error) {
+	body, _ := json.Marshal(map[string]any{
+		"key":      key,
+		"ttl_secs": int(ttl.Seconds()),
+	})
+	resp, err := w.http.Post(w.baseURL+"/storage/presign", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("worker unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("presign %s: %s", key, resp.Status)
+	}
+	var out struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	return out.URL, nil
+}

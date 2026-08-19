@@ -115,9 +115,8 @@ func (m *Memory) Search(q string) []model.Media {
 	return out
 }
 
-// seedMedia devuelve el mismo set que el mock del SPA. Cuando enchufemos el
-// data source real (Jellyfin + Radarr/Sonarr), esta función se reemplaza por
-// un cliente HTTP que lea de allí.
+// seedMedia devuelve el set de muestra. Las entradas con `StorageKey` aputan
+// al bucket de MinIO (`media/<id>/<lang>/source.mp4`).
 func seedMedia() []model.Media {
 	img := func(seed string, w, h int) string {
 		return "https://picsum.photos/seed/" + seed + "/" + itoa(w) + "/" + itoa(h)
@@ -125,8 +124,8 @@ func seedMedia() []model.Media {
 	backdrop := func(seed string) string {
 		return "https://picsum.photos/seed/" + seed + "-bg/1920/1080"
 	}
-	mk := func(id, title string, year int, rating float64, dur, kind string, genres []string, seed string) model.Media {
-		return model.Media{
+	mk := func(id, title string, year int, rating float64, dur, kind, lang string, genres []string, seed string, withStorage bool) model.Media {
+		m := model.Media{
 			ID:       id,
 			Title:    title,
 			Year:     year,
@@ -137,20 +136,21 @@ func seedMedia() []model.Media {
 			Poster:   img("m-"+id, 800, 1200),
 			Backdrop: backdrop(seed),
 			Overview: "Lorem ipsum. Película / serie del catálogo local con metadata scrapeada automáticamente por el stack *arr.",
-			Source:   "/api/media/" + id + "/stream",
+			Lang:     lang,
 		}
+		if withStorage {
+			m.StorageKey = "media/" + id + "/" + lang + "/source.mp4"
+		}
+		return m
 	}
 	return []model.Media{
-		mk("tt-001", "Neón Silencioso", 2024, 8.4, "2h 14m", "movie", []string{"Sci-Fi", "Thriller"}, "neon"),
-		mk("tt-002", "La Última Estación", 2023, 7.9, "1h 58m", "movie", []string{"Drama"}, "station"),
-		mk("tt-003", "Código Eclipse", 2024, 8.1, "Serie", "series", []string{"Sci-Fi", "Misterio"}, "eclipse"),
-		mk("tt-004", "Hielo Rojo", 2022, 7.4, "1h 47m", "movie", []string{"Acción"}, "ice"),
-		mk("tt-005", "Senderos", 2024, 8.0, "Serie", "series", []string{"Drama", "Aventura"}, "trail"),
-		mk("tt-006", "Niebla", 2023, 7.2, "1h 33m", "movie", []string{"Terror"}, "mist"),
-		mk("tt-007", "Voltaje", 2025, 8.6, "Serie", "series", []string{"Acción", "Sci-Fi"}, "volt"),
-		mk("tt-008", "Crisálida", 2024, 7.8, "2h 02m", "movie", []string{"Drama", "Romance"}, "cris"),
-		mk("tt-009", "Mar de Estrellas", 2023, 8.3, "Serie", "series", []string{"Aventura", "Sci-Fi"}, "sea"),
-		mk("tt-010", "Raíz", 2024, 7.6, "1h 50m", "movie", []string{"Thriller"}, "root"),
+		mk("tt-001", "Neón Silencioso", 2024, 8.4, "2h 14m", "movie", "es-ES", []string{"Sci-Fi", "Thriller"}, "neon", false),
+		mk("tt-002", "La Última Estación", 2023, 7.9, "1h 58m", "movie", "es-ES", []string{"Drama"}, "station", false),
+		mk("tt-003", "Código Eclipse", 2024, 8.1, "Serie", "series", "es-ES", []string{"Sci-Fi", "Misterio"}, "eclipse", false),
+		mk("tt-004", "Hielo Rojo", 2022, 7.4, "1h 47m", "movie", "es-ES", []string{"Acción"}, "ice", false),
+		mk("tt-005", "Senderos", 2024, 8.0, "Serie", "series", "es-ES", []string{"Drama", "Aventura"}, "trail", false),
+		// Esta entrada SÍ tiene StorageKey — representa un título REAL en el bucket.
+		mk("got-s01e01", "Juego de Tronos — T1 E1 (demo)", 2011, 9.2, "60m", "series", "es-ES", []string{"Fantasía", "Drama"}, "got", true),
 	}
 }
 

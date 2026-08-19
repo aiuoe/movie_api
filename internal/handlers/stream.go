@@ -1,28 +1,46 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/local/movie_api/pkg/client"
 )
 
-// Stream proxy al storage final (filesystem local, NFS, S3, Jellyfin transcode).
-// Por ahora devuelve 404 con mensaje claro — el SPA entiende esto y muestra
-// “Sin fuente todavía”.
+// Stream resuelve el `Source`/`StorageKey` de un media y devuelve una URL
+// presigned al bucket (vía movie_worker) válida por 4h. El SPA la usa
+// directo en el tag <video>, sin proxy.
 func (h *Handlers) Stream(c *fiber.Ctx) error {
 	id := c.Params("id")
-	if _, ok := h.st.ByID(id); !ok {
+	m, ok := h.st.ByID(id)
+	if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "media not found")
 	}
 
-	// Cuando enchufemos el storage real, este handler hará:
-	//   1. Resolver URL del archivo fuente (Jellyfin / NFS / S3)
-	//   2. Si el cliente pide Range, pasarlo al backend
-	//   3. Si es video > 1080p, redirigir al transcode del worker
-	//   4. Stream con Content-Type y soporte de seek
-	//
-	// Por ahora delegamos al worker para que sepa que hay un nuevo stream
-	// por catalogar.
-	_ = client.New(h.cfg.WorkerURL).NotifyStreamReady(id)
-	return fiber.NewError(fiber.StatusNotFound, "stream not indexed yet — enqueue a transcode job")
+	key := m.StorageKey
+	if key == "" {
+		// Fallback: derivamos del id y el lang del media.
+		lang := m.Lang
+		if lang == "" {
+			lang = "es-ES"
+		}
+		key = h.cfg.StorageRoot + "/" + id + "/" + lang + "/source.mp4"
+	}
+
+	wc := client.New(h.cfg.WorkerURL)
+	url, err := wc.Presign(key, 4*time.Hour)
+	if err != nil {
+		// Si el worker está caído o el objeto no existe, devolvemos 404 con
+		// mensaje claro — el SPA lo entiende como "no hay stream disponible".
+		return fiber.NewError(fiber.StatusNotFound, "stream not ready: "+err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"url":       url,
+		"expires":   time.Now().Add(4 * time.Hour).Unix(),
+		"media_id":  id,
+		"bucket":    h.cfg.Bucket,
+		"key":       key,
+	})
 }
