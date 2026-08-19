@@ -21,11 +21,17 @@ func (h *Handlers) Stream(c *fiber.Ctx) error {
 	key := m.StorageKey
 	if key == "" {
 		// Fallback: derivamos del id y el lang del media.
+		// Key es relativo al bucket (sin prefijo de bucket).
 		lang := m.Lang
 		if lang == "" {
 			lang = "es-ES"
 		}
-		key = h.cfg.StorageRoot + "/" + id + "/" + lang + "/source.mp4"
+		prefix := h.cfg.StorageRoot
+		if prefix != "" {
+			key = prefix + "/" + id + "/" + lang + "/source.mp4"
+		} else {
+			key = id + "/" + lang + "/source.mp4"
+		}
 	}
 
 	wc := client.New(h.cfg.WorkerURL)
