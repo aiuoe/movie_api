@@ -22,4 +22,3 @@ func (h *Handlers) LiveTV(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/json")
 	return c.Send(body)
 }
-</content>
