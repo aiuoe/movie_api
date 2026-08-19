@@ -5,11 +5,15 @@ import "os"
 // Config agrupa los parámetros runtime del API.
 // Todos los valores tienen defaults sensatos; se sobreescriben por env.
 type Config struct {
-	Addr        string // puerto del API
-	WorkerURL   string // URL base de movie_worker
-	JWTSecret   string // placeholder para cuando agreguemos auth
-	Bucket      string // nombre del bucket de media
-	StorageRoot string // prefijo base dentro del bucket (default "media")
+	Addr        string
+	WorkerURL   string
+	JWTSecret   string
+	Bucket      string
+	StorageRoot string
+	RadarrURL   string
+	RadarrKey   string
+	SonarrURL   string
+	SonarrKey   string
 }
 
 func Load() Config {
@@ -18,7 +22,11 @@ func Load() Config {
 		WorkerURL:   env("WORKER_URL", "http://localhost:9090"),
 		JWTSecret:   env("JWT_SECRET", "dev-secret-change-me"),
 		Bucket:      env("S3_BUCKET", "media"),
-		StorageRoot: env("STORAGE_ROOT", "media"),
+		StorageRoot: env("STORAGE_ROOT", ""),
+		RadarrURL:   env("RADARR_URL", "http://localhost:7878"),
+		RadarrKey:   env("RADARR_API_KEY", ""),
+		SonarrURL:   env("SONARR_URL", "http://localhost:8989"),
+		SonarrKey:   env("SONARR_API_KEY", ""),
 	}
 }
 
