@@ -88,7 +88,7 @@ func (h *Handlers) Request(c *fiber.Ctx) error {
 			"title":        req.Title,
 			"qualityProfileId": 1,
 			"tvdbId":       req.ExternalID,
-			"rootFolderPath": "/tv",
+			"rootFolderPath": "/downloads/tv",
 			"monitored":    true,
 			"addOptions":   map[string]any{"searchForMissingEpisodes": true},
 		}
@@ -100,7 +100,7 @@ func (h *Handlers) Request(c *fiber.Ctx) error {
 			"title":        req.Title,
 			"qualityProfileId": 1,
 			"tmdbId":       req.ExternalID,
-			"rootFolderPath": "/movies",
+			"rootFolderPath": "/downloads/movies",
 			"monitored":    true,
 			"minimumAvailability": "released",
 			"addOptions":   map[string]any{"searchForMovie": true},
