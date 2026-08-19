@@ -20,12 +20,16 @@ type Media struct {
 	Poster   string   `json:"poster"`
 	Backdrop string   `json:"backdrop"`
 	Overview string   `json:"overview"`
-	Source   string   `json:"source,omitempty"` // URL interna del stream (legacy)
+	Source   string   `json:"source,omitempty"`
 
-	// Storage path dentro del bucket (nuevo). El API lo usa para generar
-	// una presigned URL vía movie_worker.
+	// Storage path dentro del bucket.
 	StorageKey string `json:"storage_key,omitempty"`
-	Lang       string `json:"lang,omitempty"` // "es-ES", "en-US"…
+	Lang       string `json:"lang,omitempty"`
+
+	// True si es estreno (>= año actual-1). Solo los estrenos muestran
+	// "Próximamente" cuando no están disponibles; el resto muestra
+	// "Pendiente" hasta que se descarguen.
+	IsEstreno bool `json:"is_estreno"`
 
 	// Solo series
 	Seasons  int                    `json:"seasons,omitempty"`
