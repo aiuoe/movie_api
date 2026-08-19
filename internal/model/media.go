@@ -31,6 +31,14 @@ type Media struct {
 	// "Pendiente" hasta que se descarguen.
 	IsEstreno bool `json:"is_estreno"`
 
+	// Plataformas de streaming donde está disponible el título
+	// (Netflix, Disney+, HBO Max, Paramount+, Hulu, Apple TV+, Prime Video).
+	Providers []string `json:"providers"`
+
+	// ID externo: TMDB id para movies, TVDB id para series.
+	// Lo usa el endpoint /api/request para enviar a Radarr/Sonarr.
+	ExternalID uint `json:"external_id"`
+
 	// Solo series
 	Seasons  int                    `json:"seasons,omitempty"`
 	Episodes map[string][]Episode   `json:"episodes,omitempty"`
