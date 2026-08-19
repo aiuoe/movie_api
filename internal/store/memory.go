@@ -139,7 +139,8 @@ func seedMedia() []model.Media {
 			Lang:     lang,
 		}
 		if withStorage {
-			m.StorageKey = "media/" + id + "/" + lang + "/source.mp4"
+			// Key es relativo al bucket. El bucket lo agrega el worker.
+			m.StorageKey = id + "/" + lang + "/source.mp4"
 		}
 		return m
 	}
