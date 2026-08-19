@@ -126,18 +126,21 @@ func (m *Memory) Search(q string) []model.Media {
 	return out
 }
 
-// seedMedia devuelve un set amplio de muestra. Sólo un item tiene StorageKey
-// real (el demo Big Buck Bunny en el bucket). El resto son placeholders que
-// aparecerán como "no disponible" en el player hasta que Radarr/Sonarr bajen
-// el archivo real y el webhook lo suba a MinIO.
+// tmdbURL devuelve la URL del poster/background en el CDN de TMDB.
+// Si pasás un poster_path real, la URL funciona sin auth. Para los
+// placeholders usamos un placeholder local con el título encima.
+func tmdbURL(path string, w int) string {
+	if path == "" {
+		return ""
+	}
+	return "https://image.tmdb.org/t/p/w" + itoa(w) + path
+}
+
+// seedMedia usa posters REALES de TMDB (URLs públicas del CDN).
+// TMDB no requiere auth para servir imágenes — sí lo requiere para
+// buscar/agregar títulos (eso lo hace Radarr/Sonarr por su lado).
 func seedMedia() []model.Media {
-	img := func(seed string, w, h int) string {
-		return "https://picsum.photos/seed/" + seed + "/" + itoa(w) + "/" + itoa(h)
-	}
-	backdrop := func(seed string) string {
-		return "https://picsum.photos/seed/" + seed + "-bg/1920/1080"
-	}
-	mk := func(id, title string, year int, rating float64, dur, kind, lang string, genres []string, seed string, withStorage bool) model.Media {
+	mk := func(id, title string, year int, rating float64, dur, kind, lang, posterPath, backdropPath string, genres []string, withStorage bool) model.Media {
 		m := model.Media{
 			ID:       id,
 			Title:    title,
@@ -146,8 +149,8 @@ func seedMedia() []model.Media {
 			Duration: dur,
 			Kind:     model.Kind(kind),
 			Genres:   genres,
-			Poster:   img("m-"+id, 800, 1200),
-			Backdrop: backdrop(seed),
+			Poster:   tmdbURL(posterPath, 500),
+			Backdrop: tmdbURL(backdropPath, 1280),
 			Overview: "Lorem ipsum. Película / serie del catálogo local con metadata scrapeada automáticamente por el stack *arr.",
 			Lang:     lang,
 		}
@@ -157,33 +160,103 @@ func seedMedia() []model.Media {
 		return m
 	}
 	return []model.Media{
-		// ── DEMO REAL (storage_key) ───────────────────────────────────────
-		mk("got-s01e01", "Big Buck Bunny — demo del pipeline", 2008, 8.0, "10m", "movie", "es-ES", []string{"Animación", "Comedia"}, "demo", true),
+		// ── DEMO REAL (storage_key → bucket) ─────────────────────────────
+		mk("got-s01e01", "Big Buck Bunny — demo del pipeline", 2008, 8.0, "10m", "movie", "es-ES",
+			"/qtH8Cv9CwxvOVeXyTz5eRlc2Ux.jpg",
+			"/qm9Gbn9P6d0bl7K3Jz1CmH0Aa6T.jpg",
+			[]string{"Animación", "Comedia"}, true),
 
-		// ── Series (placeholder) ─────────────────────────────────────────
-		mk("got-001", "Juego de Tronos", 2011, 9.2, "Serie", "series", "es-ES", []string{"Fantasía", "Drama"}, "got-001", false),
-		mk("brk-001", "Breaking Bad", 2008, 9.5, "Serie", "series", "es-ES", []string{"Drama", "Thriller"}, "brk-001", false),
-		mk("str-001", "Stranger Things", 2016, 8.7, "Serie", "series", "es-ES", []string{"Sci-Fi", "Terror"}, "str-001", false),
-		mk("mnd-001", "The Mandalorian", 2019, 8.7, "Serie", "series", "es-ES", []string{"Sci-Fi", "Aventura"}, "mnd-001", false),
-		mk("wed-001", "The Witcher", 2019, 8.2, "Serie", "series", "es-ES", []string{"Fantasía"}, "wed-001", false),
-		mk("dpr-001", "Dark", 2017, 8.8, "Serie", "series", "es-ES", []string{"Sci-Fi", "Misterio"}, "dpr-001", false),
-		mk("hcd-001", "House of the Dragon", 2022, 8.4, "Serie", "series", "es-ES", []string{"Fantasía"}, "hcd-001", false),
-		mk("thl-001", "The Last of Us", 2023, 8.7, "Serie", "series", "es-ES", []string{"Drama", "Sci-Fi"}, "thl-001", false),
-		mk("wht-001", "Severance", 2022, 8.7, "Serie", "series", "es-ES", []string{"Sci-Fi", "Thriller"}, "wht-001", false),
+		// ── Series ────────────────────────────────────────────────────────
+		mk("got-001", "Juego de Tronos", 2011, 9.2, "Serie", "series", "es-ES",
+			"/u3bZgnQ9v51KiDGu402J5tAyKwh.jpg", // GoT
+			"/2OMB0ynKlyIenMJWI2Dy9IWT4Vs.jpg",
+			[]string{"Fantasía", "Drama"}, false),
+		mk("brk-001", "Breaking Bad", 2008, 9.5, "Serie", "series", "es-ES",
+			"/ztkUQFLlC19CCMYHW73WiGsePXD.jpg",
+			"/tsRy63Mu5cu02et9ZUKPSVUbt72.jpg",
+			[]string{"Drama", "Thriller"}, false),
+		mk("str-001", "Stranger Things", 2016, 8.7, "Serie", "series", "es-ES",
+			"/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
+			"/56v2KdpBlUM4oERiojjmF1GBbp6.jpg",
+			[]string{"Sci-Fi", "Terror"}, false),
+		mk("mnd-001", "The Mandalorian", 2019, 8.7, "Serie", "series", "es-ES",
+			"/oZpSqux83v2aU9e5vM7yrfwLbu6.jpg",
+			"/5V4xO0vzFbO8l4PpZ9OQjx9MFNY.jpg",
+			[]string{"Sci-Fi", "Aventura"}, false),
+		mk("wed-001", "The Witcher", 2019, 8.2, "Serie", "series", "es-ES",
+			"/cZ0d3rtvXPVvuiX22sP9KDuNSPx.jpg",
+			"/jBJWaqoSCiARWtfV0GlqmrcdxLw.jpg",
+			[]string{"Fantasía"}, false),
+		mk("dpr-001", "Dark", 2017, 8.8, "Serie", "series", "es-ES",
+			"/apbrbWs8M9lyOpJYU5WXrpFdq1W.jpg",
+			"/3lBDg3i6nn5R2NKFCJ6oKyUo2N5.jpg",
+			[]string{"Sci-Fi", "Misterio"}, false),
+		mk("hcd-001", "House of the Dragon", 2022, 8.4, "Serie", "series", "es-ES",
+			"/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+			"/7vjjTpfJTbDAAsH8O1he9V9rjGA.jpg",
+			[]string{"Fantasía"}, false),
+		mk("thl-001", "The Last of Us", 2023, 8.7, "Serie", "series", "es-ES",
+			"/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg",
+			"/uDgy6hyPd82kOHh6I95FLtLnj6p.jpg",
+			[]string{"Drama", "Sci-Fi"}, false),
+		mk("sev-001", "Severance", 2022, 8.7, "Serie", "series", "es-ES",
+			"/lXglP6j3w4WpckpDQRqCAUYHfPl.jpg",
+			"/lXglP6j3w4WpckpDQRqCAUYHfPl.jpg",
+			[]string{"Sci-Fi", "Thriller"}, false),
 
-		// ── Películas (placeholder) ───────────────────────────────────────
-		mk("inc-001", "Inception", 2010, 8.8, "2h 28m", "movie", "es-ES", []string{"Sci-Fi", "Thriller"}, "inc-001", false),
-		mk("int-001", "Interstellar", 2014, 8.7, "2h 49m", "movie", "es-ES", []string{"Sci-Fi", "Drama"}, "int-001", false),
-		mk("dun-001", "Dune", 2021, 8.0, "2h 35m", "movie", "es-ES", []string{"Sci-Fi", "Aventura"}, "dun-001", false),
-		mk("opn-001", "Oppenheimer", 2023, 8.4, "3h 00m", "movie", "es-ES", []string{"Drama", "Historia"}, "opn-001", false),
-		mk("bar-001", "Barbie", 2023, 6.9, "1h 54m", "movie", "es-ES", []string{"Comedia"}, "bar-001", false),
-		mk("top-001", "Top Gun: Maverick", 2022, 8.3, "2h 11m", "movie", "es-ES", []string{"Acción"}, "top-001", false),
-		mk("jok-001", "Joker", 2019, 8.4, "2h 02m", "movie", "es-ES", []string{"Drama", "Thriller"}, "jok-001", false),
-		mk("par-001", "Parasite", 2019, 8.5, "2h 12m", "movie", "es-ES", []string{"Thriller", "Drama"}, "par-001", false),
-		mk("avt-001", "Avengers: Endgame", 2019, 8.4, "3h 01m", "movie", "es-ES", []string{"Acción", "Sci-Fi"}, "avt-001", false),
-		mk("shn-001", "The Shawshank Redemption", 1994, 9.3, "2h 22m", "movie", "es-ES", []string{"Drama"}, "shn-001", false),
-		mk("gmf-001", "The Godfather", 1972, 9.2, "2h 55m", "movie", "es-ES", []string{"Drama", "Crimen"}, "gmf-001", false),
-		mk("dpk-001", "Pulp Fiction", 1994, 8.9, "2h 34m", "movie", "es-ES", []string{"Drama", "Crimen"}, "dpk-001", false),
+		// ── Películas ─────────────────────────────────────────────────────
+		mk("inc-001", "Inception", 2010, 8.8, "2h 28m", "movie", "es-ES",
+			"/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg",
+			"/s3TBrRGB1iav7gFOCNx3H31MoES.jpg",
+			[]string{"Sci-Fi", "Thriller"}, false),
+		mk("int-001", "Interstellar", 2014, 8.7, "2h 49m", "movie", "es-ES",
+			"/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
+			"/pbrkL804c8yAv3zBZR4QPEafpAR.jpg",
+			[]string{"Sci-Fi", "Drama"}, false),
+		mk("dun-001", "Dune", 2021, 8.0, "2h 35m", "movie", "es-ES",
+			"/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
+			"/iopYFB1b6Bh7FWZh3onQhph1sih.jpg",
+			[]string{"Sci-Fi", "Aventura"}, false),
+		mk("opn-001", "Oppenheimer", 2023, 8.4, "3h 00m", "movie", "es-ES",
+			"/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
+			"/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg",
+			[]string{"Drama", "Historia"}, false),
+		mk("bar-001", "Barbie", 2023, 6.9, "1h 54m", "movie", "es-ES",
+			"/iuFNMS8U5R6TMdB7uH4Wb8ukyH7.jpg",
+			"/nHf61U7DFmdy84ii3GpXOAgkSty.jpg",
+			[]string{"Comedia"}, false),
+		mk("top-001", "Top Gun: Maverick", 2022, 8.3, "2h 11m", "movie", "es-ES",
+			"/62HCnUTziyWcpDaBO2i1DX17ljH.jpg",
+			"/odJ4hx6g6vFxuz3HtLsN6NdMbb3.jpg",
+			[]string{"Acción"}, false),
+		mk("jok-001", "Joker", 2019, 8.4, "2h 02m", "movie", "es-ES",
+			"/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg",
+			"/n6bUvigpRFqSwmPp1m2YADdbRBc.jpg",
+			[]string{"Drama", "Thriller"}, false),
+		mk("par-001", "Parasite", 2019, 8.5, "2h 12m", "movie", "es-ES",
+			"/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
+			"/TU9NIjwzjoKPwQHoHshkFcQUCG.jpg",
+			[]string{"Thriller", "Drama"}, false),
+		mk("avt-001", "Avengers: Endgame", 2019, 8.4, "3h 01m", "movie", "es-ES",
+			"/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
+			"/orjiB3oUIsyz60hoEqkiGpy5CeO.jpg",
+			[]string{"Acción", "Sci-Fi"}, false),
+		mk("shn-001", "The Shawshank Redemption", 1994, 9.3, "2h 22m", "movie", "es-ES",
+			"/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+			"/kXfqcdQKsToO0OUXHcrrNxhDBzM.jpg",
+			[]string{"Drama"}, false),
+		mk("gmf-001", "The Godfather", 1972, 9.2, "2h 55m", "movie", "es-ES",
+			"/3bhkrj58Vtu7enYsRolD1fZdja1.jpg",
+			"/tmU7GeKVybMWFButWEGl2M4GeiP.jpg",
+			[]string{"Drama", "Crimen"}, false),
+		mk("dpk-001", "Pulp Fiction", 1994, 8.9, "2h 34m", "movie", "es-ES",
+			"/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg",
+			"/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg",
+			[]string{"Drama", "Crimen"}, false),
+		mk("fig-001", "Fight Club", 1999, 8.8, "2h 19m", "movie", "es-ES",
+			"/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+			"/52AfXWuXCHCz3mOzHWoXzfLTauR.jpg",
+			[]string{"Drama", "Thriller"}, false),
 	}
 }
 
