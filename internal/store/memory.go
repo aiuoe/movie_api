@@ -31,15 +31,26 @@ func (m *Memory) Seed() error {
 	for _, s := range seeds {
 		m.byID[s.ID] = s
 	}
+	// El primer item con StorageKey es el "real" (Big Buck Bunny).
+	var demo model.Media
+	for _, s := range seeds {
+		if s.StorageKey != "" {
+			demo = s
+			break
+		}
+	}
+	if demo.ID == "" {
+		demo = seeds[0]
+	}
 	m.hero = model.Hero{
-		Media:   seeds[0],
-		Tagline: "Una historia que cruza el tiempo y la memoria.",
+		Media:   demo,
+		Tagline: "Demo del pipeline · Big Buck Bunny (CC-BY) en MinIO",
 	}
 	m.cw = []model.ContinueWatching{
+		{Media: demo, Progress: 0.0, Episode: "T1 · E1"},
 		{Media: seeds[0], Progress: 0.42, Episode: "T1 · E3"},
 		{Media: seeds[2], Progress: 0.78, Episode: "T2 · E5"},
 		{Media: seeds[4], Progress: 0.15, Episode: "T1 · E1"},
-		{Media: seeds[5], Progress: 0.93, Episode: "T3 · E8"},
 	}
 	return nil
 }
