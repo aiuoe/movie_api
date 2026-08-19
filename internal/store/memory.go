@@ -92,7 +92,7 @@ func (m *Memory) ByID(id string) (model.Media, bool) {
 	if !ok {
 		return model.Media{}, false
 	}
-	return v, true
+	return v, ok
 }
 
 func (m *Memory) ContinueWatching() []model.ContinueWatching {
@@ -126,8 +126,10 @@ func (m *Memory) Search(q string) []model.Media {
 	return out
 }
 
-// seedMedia devuelve el set de muestra. Las entradas con `StorageKey` aputan
-// al bucket de MinIO (`media/<id>/<lang>/source.mp4`).
+// seedMedia devuelve un set amplio de muestra. Sólo un item tiene StorageKey
+// real (el demo Big Buck Bunny en el bucket). El resto son placeholders que
+// aparecerán como "no disponible" en el player hasta que Radarr/Sonarr bajen
+// el archivo real y el webhook lo suba a MinIO.
 func seedMedia() []model.Media {
 	img := func(seed string, w, h int) string {
 		return "https://picsum.photos/seed/" + seed + "/" + itoa(w) + "/" + itoa(h)
@@ -150,19 +152,38 @@ func seedMedia() []model.Media {
 			Lang:     lang,
 		}
 		if withStorage {
-			// Key es relativo al bucket. El bucket lo agrega el worker.
 			m.StorageKey = id + "/" + lang + "/source.mp4"
 		}
 		return m
 	}
 	return []model.Media{
-		mk("tt-001", "Neón Silencioso", 2024, 8.4, "2h 14m", "movie", "es-ES", []string{"Sci-Fi", "Thriller"}, "neon", false),
-		mk("tt-002", "La Última Estación", 2023, 7.9, "1h 58m", "movie", "es-ES", []string{"Drama"}, "station", false),
-		mk("tt-003", "Código Eclipse", 2024, 8.1, "Serie", "series", "es-ES", []string{"Sci-Fi", "Misterio"}, "eclipse", false),
-		mk("tt-004", "Hielo Rojo", 2022, 7.4, "1h 47m", "movie", "es-ES", []string{"Acción"}, "ice", false),
-		mk("tt-005", "Senderos", 2024, 8.0, "Serie", "series", "es-ES", []string{"Drama", "Aventura"}, "trail", false),
-		// Esta entrada SÍ tiene StorageKey — representa un título REAL en el bucket.
-		mk("got-s01e01", "Juego de Tronos — T1 E1 (demo)", 2011, 9.2, "60m", "series", "es-ES", []string{"Fantasía", "Drama"}, "got", true),
+		// ── DEMO REAL (storage_key) ───────────────────────────────────────
+		mk("got-s01e01", "Big Buck Bunny — demo del pipeline", 2008, 8.0, "10m", "movie", "es-ES", []string{"Animación", "Comedia"}, "demo", true),
+
+		// ── Series (placeholder) ─────────────────────────────────────────
+		mk("got-001", "Juego de Tronos", 2011, 9.2, "Serie", "series", "es-ES", []string{"Fantasía", "Drama"}, "got-001", false),
+		mk("brk-001", "Breaking Bad", 2008, 9.5, "Serie", "series", "es-ES", []string{"Drama", "Thriller"}, "brk-001", false),
+		mk("str-001", "Stranger Things", 2016, 8.7, "Serie", "series", "es-ES", []string{"Sci-Fi", "Terror"}, "str-001", false),
+		mk("mnd-001", "The Mandalorian", 2019, 8.7, "Serie", "series", "es-ES", []string{"Sci-Fi", "Aventura"}, "mnd-001", false),
+		mk("wed-001", "The Witcher", 2019, 8.2, "Serie", "series", "es-ES", []string{"Fantasía"}, "wed-001", false),
+		mk("dpr-001", "Dark", 2017, 8.8, "Serie", "series", "es-ES", []string{"Sci-Fi", "Misterio"}, "dpr-001", false),
+		mk("hcd-001", "House of the Dragon", 2022, 8.4, "Serie", "series", "es-ES", []string{"Fantasía"}, "hcd-001", false),
+		mk("thl-001", "The Last of Us", 2023, 8.7, "Serie", "series", "es-ES", []string{"Drama", "Sci-Fi"}, "thl-001", false),
+		mk("wht-001", "Severance", 2022, 8.7, "Serie", "series", "es-ES", []string{"Sci-Fi", "Thriller"}, "wht-001", false),
+
+		// ── Películas (placeholder) ───────────────────────────────────────
+		mk("inc-001", "Inception", 2010, 8.8, "2h 28m", "movie", "es-ES", []string{"Sci-Fi", "Thriller"}, "inc-001", false),
+		mk("int-001", "Interstellar", 2014, 8.7, "2h 49m", "movie", "es-ES", []string{"Sci-Fi", "Drama"}, "int-001", false),
+		mk("dun-001", "Dune", 2021, 8.0, "2h 35m", "movie", "es-ES", []string{"Sci-Fi", "Aventura"}, "dun-001", false),
+		mk("opn-001", "Oppenheimer", 2023, 8.4, "3h 00m", "movie", "es-ES", []string{"Drama", "Historia"}, "opn-001", false),
+		mk("bar-001", "Barbie", 2023, 6.9, "1h 54m", "movie", "es-ES", []string{"Comedia"}, "bar-001", false),
+		mk("top-001", "Top Gun: Maverick", 2022, 8.3, "2h 11m", "movie", "es-ES", []string{"Acción"}, "top-001", false),
+		mk("jok-001", "Joker", 2019, 8.4, "2h 02m", "movie", "es-ES", []string{"Drama", "Thriller"}, "jok-001", false),
+		mk("par-001", "Parasite", 2019, 8.5, "2h 12m", "movie", "es-ES", []string{"Thriller", "Drama"}, "par-001", false),
+		mk("avt-001", "Avengers: Endgame", 2019, 8.4, "3h 01m", "movie", "es-ES", []string{"Acción", "Sci-Fi"}, "avt-001", false),
+		mk("shn-001", "The Shawshank Redemption", 1994, 9.3, "2h 22m", "movie", "es-ES", []string{"Drama"}, "shn-001", false),
+		mk("gmf-001", "The Godfather", 1972, 9.2, "2h 55m", "movie", "es-ES", []string{"Drama", "Crimen"}, "gmf-001", false),
+		mk("dpk-001", "Pulp Fiction", 1994, 8.9, "2h 34m", "movie", "es-ES", []string{"Drama", "Crimen"}, "dpk-001", false),
 	}
 }
 
