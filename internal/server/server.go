@@ -38,6 +38,7 @@ func New(cfg config.Config, st store.Store) *fiber.App {
 	app.Get("/api/me/continue", h.ContinueWatching)
 	app.Get("/api/search", h.Search)
 	app.Get("/api/lookup", h.Lookup)
+	app.Get("/api/livetv", h.LiveTV)
 	app.Post("/api/request", h.Request)
 	app.Post("/api/jobs", h.EnqueueJob)
 
