@@ -39,7 +39,7 @@ func (m *Memory) Seed() error {
 		{Media: seeds[0], Progress: 0.42, Episode: "T1 · E3"},
 		{Media: seeds[2], Progress: 0.78, Episode: "T2 · E5"},
 		{Media: seeds[4], Progress: 0.15, Episode: "T1 · E1"},
-		{Media: seeds[6], Progress: 0.93, Episode: "T3 · E8"},
+		{Media: seeds[5], Progress: 0.93, Episode: "T3 · E8"},
 	}
 	return nil
 }
