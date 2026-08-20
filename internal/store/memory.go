@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -180,6 +181,58 @@ func backdropURL(path, title string, w int) string {
 	return fmt.Sprintf("https://placehold.co/%dx%d/171717/999?text=%s", w, w*9/16, urlQuery(title))
 }
 
+// posterSVG genera un poster inline (data URI) con el título y branding del
+// provider. Sin requests externos — funciona en cualquier red.
+func posterSVG(title string, providers []string) string {
+	primary := "Streaming"
+	bg := "#262626"
+	fg := "#eeeeee"
+	brand := "STREAMING"
+	if len(providers) > 0 {
+		primary = providers[0]
+	}
+	switch primary {
+	case "Netflix":
+		bg, fg, brand = "#e50914", "#ffffff", "NETFLIX"
+	case "Disney+":
+		bg, fg, brand = "#0f1e3d", "#ffffff", "DISNEY+"
+	case "HBO Max":
+		bg, fg, brand = "#9b51e0", "#ffffff", "HBO MAX"
+	case "Paramount+":
+		bg, fg, brand = "#0064ff", "#ffffff", "PARAMOUNT+"
+	case "Hulu":
+		bg, fg, brand = "#1ce783", "#000000", "HULU"
+	case "Apple TV+":
+		bg, fg, brand = "#000000", "#ffffff", "APPLE TV+"
+	case "Prime Video":
+		bg, fg, brand = "#1399ff", "#ffffff", "PRIME VIDEO"
+	case "Demo":
+		bg, fg, brand = "#404040", "#ffffff", "DEMO"
+	}
+	t := title
+	if len([]rune(t)) > 40 {
+		t = string([]rune(t)[:36]) + "…"
+	}
+	svg := fmt.Sprintf(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 750'>
+<rect width='500' height='750' fill='%s'/>
+<rect x='20' y='20' width='460' height='710' fill='none' stroke='%s' stroke-opacity='0.3' stroke-width='1.5'/>
+<text x='250' y='100' font-family='Inter,system-ui,sans-serif' font-size='28' font-weight='800' fill='%s' text-anchor='middle' letter-spacing='3'>%s</text>
+<text x='250' y='375' font-family='Inter,system-ui,sans-serif' font-size='34' font-weight='700' fill='%s' text-anchor='middle'>%s</text>
+<text x='250' y='720' font-family='Inter,system-ui,sans-serif' font-size='14' fill='%s' fill-opacity='0.6' text-anchor='middle'>movie_spa · self-hosted</text>
+</svg>`,
+		bg, fg, fg, brand, fg, escapeXML(t), fg)
+	// data URI: url-encode # → %23, otros no importa en SVGBase
+	return "data:image/svg+xml;utf8," + url.PathEscape(svg)
+}
+
+// escapeXML escapa < > & " ' para SVG inline
+func escapeXML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
+}
+
 func urlQuery(s string) string {
 	var out strings.Builder
 	for _, r := range s {
@@ -198,7 +251,7 @@ func urlQuery(s string) string {
 // seedMedia: usa posters reales de TMDB para los verificados + placehold.co para el resto.
 // is_estreno = año >= 2024.
 func seedMedia() []model.Media {
-	return []model.Media{
+	items := []model.Media{
 		// ── DEMO REAL (storage_key → bucket) ─────────────────────────────
 		{
 			ID:         "demo-001",
@@ -1128,6 +1181,15 @@ func seedMedia() []model.Media {
 			ExternalID: 507086,
 		},
 	}
+	// Reemplazar todos los posters/backdrops de placehold.co con SVG inline
+	// (data: URIs). Funcionan sin internet y nunca fallan.
+	for i := range items {
+		if strings.Contains(items[i].Poster, "placehold.co") {
+			items[i].Poster = posterSVG(items[i].Title, items[i].Providers)
+			items[i].Backdrop = posterSVG(items[i].Title, items[i].Providers)
+		}
+	}
+	return items
 }
 
 
