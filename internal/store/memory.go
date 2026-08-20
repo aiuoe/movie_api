@@ -1230,47 +1230,60 @@ func enrichFromTMDB(items []model.Media) {
 			continue
 		}
 		key := fmt.Sprintf("%s-%d", items[i].Kind, items[i].ExternalID)
-		if cached, ok := cache[key]; ok {
-			if cached.PosterPath != "" {
-				items[i].Poster = "https://image.tmdb.org/t/p/w500" + cached.PosterPath
-			}
-			if cached.BackdropPath != "" {
-				items[i].Backdrop = "https://image.tmdb.org/t/p/w1280" + cached.BackdropPath
-			}
+		if cached, ok := cache[key]; ok && cached.PosterPath != "" {
+			items[i].Poster = "https://image.tmdb.org/t/p/w500" + cached.PosterPath
+			items[i].Backdrop = "https://image.tmdb.org/t/p/w1280" + cached.BackdropPath
 			continue
 		}
 
-		endpoint := fmt.Sprintf("https://api.themoviedb.org/3/movie/%d", items[i].ExternalID)
+		var poster, backdrop string
+
+		// Para series: el ExternalID es TVDB. Usar /find para mapear.
 		if items[i].Kind == model.Kind("series") {
-			endpoint = fmt.Sprintf("https://api.themoviedb.org/3/tv/%d", items[i].ExternalID)
+			findURL := fmt.Sprintf(
+				"https://api.themoviedb.org/3/find/%d?api_key=%s&external_source=tvdb_id",
+				items[i].ExternalID, apiKey)
+			resp, err := client.Get(findURL)
+			if err == nil && resp.StatusCode == 200 {
+				body, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				var found struct {
+					TVResults []struct {
+						PosterPath   string `json:"poster_path"`
+						BackdropPath string `json:"backdrop_path"`
+						ID           int    `json:"id"`
+					} `json:"tv_results"`
+				}
+				if json.Unmarshal(body, &found) == nil && len(found.TVResults) > 0 {
+					poster = found.TVResults[0].PosterPath
+					backdrop = found.TVResults[0].BackdropPath
+				}
+			}
+		} else {
+			// Movies: ExternalID es TMDB directo
+			movieURL := fmt.Sprintf("https://api.themoviedb.org/3/movie/%d?api_key=%s", items[i].ExternalID, apiKey)
+			resp, err := client.Get(movieURL)
+			if err == nil && resp.StatusCode == 200 {
+				body, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				var data struct {
+					PosterPath   string `json:"poster_path"`
+					BackdropPath string `json:"backdrop_path"`
+				}
+				if json.Unmarshal(body, &data) == nil {
+					poster = data.PosterPath
+					backdrop = data.BackdropPath
+				}
+			}
 		}
 
-		req, _ := http.NewRequest("GET", endpoint+"?api_key="+apiKey, nil)
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode != 200 {
-			continue
-		}
-
-		var data struct {
-			PosterPath   string `json:"poster_path"`
-			BackdropPath string `json:"backdrop_path"`
-		}
-		if err := json.Unmarshal(body, &data); err != nil {
-			continue
-		}
-
-		cache[key] = TMDBPoster{PosterPath: data.PosterPath, BackdropPath: data.BackdropPath}
+		cache[key] = TMDBPoster{PosterPath: poster, BackdropPath: backdrop}
 		needFlush = true
-		if data.PosterPath != "" {
-			items[i].Poster = "https://image.tmdb.org/t/p/w500" + data.PosterPath
+		if poster != "" {
+			items[i].Poster = "https://image.tmdb.org/t/p/w500" + poster
 		}
-		if data.BackdropPath != "" {
-			items[i].Backdrop = "https://image.tmdb.org/t/p/w1280" + data.BackdropPath
+		if backdrop != "" {
+			items[i].Backdrop = "https://image.tmdb.org/t/p/w1280" + backdrop
 		}
 	}
 
