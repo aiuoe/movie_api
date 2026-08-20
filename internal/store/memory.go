@@ -1,12 +1,17 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/local/movie_api/internal/model"
 )
@@ -1181,15 +1186,99 @@ func seedMedia() []model.Media {
 			ExternalID: 507086,
 		},
 	}
-	// Reemplazar todos los posters/backdrops de placehold.co con SVG inline
-	// (data: URIs). Funcionan sin internet y nunca fallan.
+
+	// Enriquece con TMDB: poster_path + backdrop_path reales.
+	// Cache en disco para no pegarle a TMDB cada restart.
+	enrichFromTMDB(items)
+
+	// Si no se encontró en TMDB, fallback a SVG inline con brand.
 	for i := range items {
-		if strings.Contains(items[i].Poster, "placehold.co") {
+		if strings.Contains(items[i].Poster, "placehold.co") || items[i].Poster == "" {
 			items[i].Poster = posterSVG(items[i].Title, items[i].Providers)
 			items[i].Backdrop = posterSVG(items[i].Title, items[i].Providers)
 		}
 	}
 	return items
+}
+
+// TMDBPoster es lo que cacheamos por external_id.
+type TMDBPoster struct {
+	PosterPath   string `json:"poster_path"`
+	BackdropPath string `json:"backdrop_path"`
+}
+
+// enrichFromTMDB consulta TMDB una vez por external_id y guarda poster/backdrop.
+// Cache en /tmp/tmdb_cache.json — sobrevive restart.
+func enrichFromTMDB(items []model.Media) {
+	apiKey := os.Getenv("TMDB_API_KEY")
+	if apiKey == "" {
+		return
+	}
+
+	// Cargar cache previa.
+	cacheFile := "/tmp/tmdb_cache.json"
+	cache := map[string]TMDBPoster{}
+	if data, err := os.ReadFile(cacheFile); err == nil {
+		_ = json.Unmarshal(data, &cache)
+	}
+
+	client := &http.Client{Timeout: 8 * time.Second}
+	needFlush := false
+
+	for i := range items {
+		if items[i].ExternalID == 0 {
+			continue
+		}
+		key := fmt.Sprintf("%s-%d", items[i].Kind, items[i].ExternalID)
+		if cached, ok := cache[key]; ok {
+			if cached.PosterPath != "" {
+				items[i].Poster = "https://image.tmdb.org/t/p/w500" + cached.PosterPath
+			}
+			if cached.BackdropPath != "" {
+				items[i].Backdrop = "https://image.tmdb.org/t/p/w1280" + cached.BackdropPath
+			}
+			continue
+		}
+
+		endpoint := fmt.Sprintf("https://api.themoviedb.org/3/movie/%d", items[i].ExternalID)
+		if items[i].Kind == model.Kind("series") {
+			endpoint = fmt.Sprintf("https://api.themoviedb.org/3/tv/%d", items[i].ExternalID)
+		}
+
+		req, _ := http.NewRequest("GET", endpoint+"?api_key="+apiKey, nil)
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			continue
+		}
+
+		var data struct {
+			PosterPath   string `json:"poster_path"`
+			BackdropPath string `json:"backdrop_path"`
+		}
+		if err := json.Unmarshal(body, &data); err != nil {
+			continue
+		}
+
+		cache[key] = TMDBPoster{PosterPath: data.PosterPath, BackdropPath: data.BackdropPath}
+		needFlush = true
+		if data.PosterPath != "" {
+			items[i].Poster = "https://image.tmdb.org/t/p/w500" + data.PosterPath
+		}
+		if data.BackdropPath != "" {
+			items[i].Backdrop = "https://image.tmdb.org/t/p/w1280" + data.BackdropPath
+		}
+	}
+
+	if needFlush {
+		if data, err := json.MarshalIndent(cache, "", "  "); err == nil {
+			os.WriteFile(cacheFile, data, 0644)
+		}
+	}
 }
 
 
